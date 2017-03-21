@@ -123,6 +123,8 @@ public class GameController : MonoBehaviour {
     private float m_CamMovementDuration = 3f;
     private float m_CamStartTime;
     private bool m_IsCameraMoving = false;
+    
+
     void MoveCamera()
     {
         float frac = (Time.time - m_CamStartTime) / m_CamMovementDuration;
@@ -141,11 +143,16 @@ public class GameController : MonoBehaviour {
 
         ClickCheck();
 
+        KeyboardInput();
+
         if (m_IsCameraMoving)
         {
             MoveCamera();
-        }
+        }       
+	}
 
+    void KeyboardInput()
+    {
         if (Input.GetKeyDown(KeyCode.RightArrow))
         {
             ChangeView(1);
@@ -156,13 +163,35 @@ public class GameController : MonoBehaviour {
         }
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            //Move(1,2,_Disk6);
-            m_AnimateStartPOS = _Disk1.transform.position;
-            m_AnimateEndPOS = new Vector3(_Peg1.transform.position.x, m_TopOfPegs, _Peg1.transform.position.z);
-            m_AnimationStartTime = Time.time;
-            m_State = GameState.animateUp;
+            //Get Ai to move
+           
+            Move m = GetNextMove(_NumberOfDisks);
+            GameObject toMove = _Disk1;
+            switch (m.disk)
+            {
+                case 1:
+                    toMove = _Disk1;
+                    break;
+                case 2:
+                    toMove = _Disk2;
+                    break;
+                case 3:
+                    toMove = _Disk3;
+                    break;
+                case 4:
+                    toMove = _Disk4;
+                    break;
+                case 5:
+                    toMove = _Disk5;
+                    break;
+                case 6:
+                    toMove = _Disk6;
+                    break;
+            }
+            m_SelectedDisk = toMove;
+            Move(m.from +1, m.to+1, toMove);
         }
-	}
+    }
 
     void ClickCheck()
     {
@@ -332,4 +361,50 @@ public class GameController : MonoBehaviour {
             m_SelectedDisk = null;
         }
     }
+
+    Move GetNextMove(int biggestPeg)
+    {
+        //first find where our biggest disk is.
+        for (int i = 0; i < m_PegContent.Count; ++i)
+        {
+            if (m_PegContent[i].IndexOf(biggestPeg) != -1)//Found the largest disk
+            {
+                //if the biggest disk is already on the correct peg.
+                if (i == _NumberOfPegs - 1)
+                {
+                    return GetNextMove(biggestPeg - 1);
+                }
+                else//else we need to move x disks from there.
+                {
+                    if (m_PegContent[i].Count == 1 && m_PegContent[_NumberOfPegs-1].Count == 0)//
+                    {
+
+                        return new Move(i , _NumberOfPegs - 1, biggestPeg);
+                    }
+                }
+            }
+        }
+
+
+        return new Move(0, 0, 0);
+    }
 }
+
+
+public struct Move
+{
+    public Move(int f, int t,int d) {
+        disk = d;
+        to = t;
+        from = f;
+    }
+    public int disk;
+    public int from;
+    public int to;
+    public override string ToString()
+    {
+        return "disk: " + disk +" from:"+ from + " to: " + to;
+    }
+}
+
+

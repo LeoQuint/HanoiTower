@@ -32,6 +32,9 @@ public class GameController : MonoBehaviour {
     [SerializeField]
     GameObject _Disk6;
 
+    [SerializeField]
+    GameObject _GameOverImage;
+
     private GameState m_State;
     private float m_DiskSize = 0.4f;
     private float m_TopOfPegs = 6f;
@@ -51,6 +54,10 @@ public class GameController : MonoBehaviour {
 
     private Dictionary<string, GameObject> m_Pegs = new Dictionary<string, GameObject>();
     private Dictionary<string, GameObject> m_Disks = new Dictionary<string, GameObject>();
+    //Solver
+    private List<Move> m_Solution = new List<Move>();
+    private Stack<Move> m_BadMoves = new Stack<Move>();
+    private int m_CurrentMove = 0;
 
     private GameObject m_SelectedDisk;
 
@@ -66,8 +73,10 @@ public class GameController : MonoBehaviour {
     [SerializeField]
     LayerMask m_RaycastMask;
 
+
     // Use this for initialization
     void Start () {
+
         m_MainCam = Camera.main.transform;
         m_State = GameState.intro;
         m_SelectedDisk = null;
@@ -94,7 +103,7 @@ public class GameController : MonoBehaviour {
         {
             m_Pegs.Add(p.name, p);
         }
-
+        CalculateSolution();
         m_State = GameState.waiting;
     }
 
@@ -164,36 +173,11 @@ public class GameController : MonoBehaviour {
         {
             ChangeView(-1);
         }
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (Input.GetKeyDown(KeyCode.Space) && m_State == GameState.waiting)
         {
-            //Get Ai to move
-           
             Move m = GetNextMove();
-            Debug.Log("Computer suggest moving disk" + m.disk + " from peg " + m.from + " to peg "+ m.to);
-            GameObject toMove = _Disk1;
-            switch (m.disk)
-            {
-                case 1:
-                    toMove = _Disk1;
-                    break;
-                case 2:
-                    toMove = _Disk2;
-                    break;
-                case 3:
-                    toMove = _Disk3;
-                    break;
-                case 4:
-                    toMove = _Disk4;
-                    break;
-                case 5:
-                    toMove = _Disk5;
-                    break;
-                case 6:
-                    toMove = _Disk6;
-                    break;
-            }
-            m_SelectedDisk = toMove;
-            Move(m.from +1, m.to+1, toMove);
+            m_SelectedDisk = m_Disks[m_PegContent[m.from - 1].Peek().ToString()];
+            Move(m.from, m.to, m_SelectedDisk);
         }
     }
 
@@ -230,6 +214,8 @@ public class GameController : MonoBehaviour {
         }
     }
 
+    private float gameOverPopTimer = 0f;
+
     void CheckState()
     {
         switch (m_State)
@@ -248,15 +234,34 @@ public class GameController : MonoBehaviour {
                 AnimateDown();
                 break;
             case GameState.gameover:
+                if (!_GameOverImage.activeSelf)
+                {
+                    _GameOverImage.SetActive(true);
+                }
+                if(_GameOverImage.transform.localScale.x < 1f)
+                _GameOverImage.transform.localScale = Vector3.one * (Time.time - gameOverPopTimer);
                 break;
         }
     }
     //from peg X to peg Y moving Z object.
     public void Move(int from, int to, GameObject toMove)
     {
+        
         if (CheckMoveLegality(from, to, int.Parse( toMove.name)))
         {
-
+            Move latest = new Move(from, to);
+            if (m_Solution[m_CurrentMove] == latest)
+            {
+                m_CurrentMove++;
+            }
+            else if (m_BadMoves.Count > 0 && latest == m_BadMoves.Peek().Reverse())
+            {
+                m_BadMoves.Pop();
+            }
+            else
+            {
+                m_BadMoves.Push(latest);
+            }
             Transform fromT = m_Pegs[from.ToString()].transform;
             m_DestinationTransform = AddDiskToPeg(to, int.Parse(toMove.name));
             m_AnimateStartPOS = toMove.transform.position;
@@ -363,32 +368,80 @@ public class GameController : MonoBehaviour {
         {
             m_State = GameState.waiting;
             m_SelectedDisk = null;
+            if (IsGameOver())
+            {
+                Debug.Log("GameOver");
+                m_State = GameState.gameover;
+            }
         }
     }
 
     Move GetNextMove()
     {
-        
+        if (m_BadMoves.Count > 0)
+        {
+            return m_BadMoves.Peek().Reverse();
+        }
+        else
+        {
+            return m_Solution[m_CurrentMove];
+        }
+    }
 
-        return new Move(0, 0, 0);
+    bool IsGameOver()
+    {
+        return m_PegContent[_NumberOfDisks - 1].Count == _NumberOfDisks;
+    }
+    
+    void Solver(int diskCount, int fromPole, int toPole, int viaPole)
+    {
+        if (diskCount == 1)
+        {
+            m_Solution.Add(new Move(fromPole, toPole));
+            Debug.Log("Move disk from pole " + fromPole + " to pole " + toPole);
+        }
+        else
+        {            
+            Solver(diskCount - 1, fromPole, viaPole, toPole);
+            Solver(1, fromPole, toPole, viaPole);
+            Solver(diskCount - 1, viaPole, toPole, fromPole);
+        }
+    }
+
+    void CalculateSolution()
+    {
+        Solver(_NumberOfDisks, 1, _NumberOfPegs, 2);
     }
 }
-
 
 public struct Move
 {
-    public Move(int f, int t,int d) {
-        disk = d;
+    public Move(int f, int t) {
         to = t;
         from = f;
     }
-    public int disk;
     public int from;
     public int to;
+
+    public static bool operator ==(Move obj1, Move obj2)
+    {
+        return (obj1.from == obj2.from
+                    && obj1.to == obj2.to);
+    }
+    
+    public static bool operator !=(Move obj1, Move obj2)
+    {
+        return !(obj1.from == obj2.from
+                    && obj1.to == obj2.to);
+    }
+
+    public Move Reverse()
+    {
+        return new Move(to, from);
+    }
+
     public override string ToString()
     {
-        return "disk: " + disk +" from:"+ from + " to: " + to;
+        return " from:"+ from + " to: " + to;
     }
 }
-
-

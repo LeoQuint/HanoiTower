@@ -46,6 +46,8 @@ public class GameController : MonoBehaviour {
     private Vector3 m_DestinationTransform;
 
     private List<Stack<int>> m_PegContent = new List<Stack<int>>();
+
+    private List<Vector3> _StartPos = new List<Vector3>();
    
     private Stack<int> m_P1 = new Stack<int>();
     private Stack<int> m_P2 = new Stack<int>();
@@ -76,7 +78,10 @@ public class GameController : MonoBehaviour {
 
     // Use this for initialization
     void Start () {
-
+        for (int i = 0; i < 6; i++)
+        {
+            _StartPos.Add(Vector3.zero);
+        }
         m_MainCam = Camera.main.transform;
         m_State = GameState.intro;
         m_SelectedDisk = null;
@@ -96,6 +101,7 @@ public class GameController : MonoBehaviour {
         GameObject[] disks = GameObject.FindGameObjectsWithTag("disk");
         foreach (GameObject d in disks)
         {
+            _StartPos[int.Parse(d.name)-1] = (d.transform.position);
             m_Disks.Add(d.name, d);
         }
         GameObject[] pegs = GameObject.FindGameObjectsWithTag("peg");
@@ -176,6 +182,7 @@ public class GameController : MonoBehaviour {
         if (Input.GetKeyDown(KeyCode.Space) && m_State == GameState.waiting)
         {
             Move m = GetNextMove();
+            Debug.Log("CPU suggest: " + m.from + " to " + m.to);
             m_SelectedDisk = m_Disks[m_PegContent[m.from - 1].Peek().ToString()];
             Move(m.from, m.to, m_SelectedDisk);
         }
@@ -371,6 +378,7 @@ public class GameController : MonoBehaviour {
             if (IsGameOver())
             {
                 Debug.Log("GameOver");
+                gameOverPopTimer = Time.time;
                 m_State = GameState.gameover;
             }
         }
@@ -390,7 +398,7 @@ public class GameController : MonoBehaviour {
 
     bool IsGameOver()
     {
-        return m_PegContent[_NumberOfDisks - 1].Count == _NumberOfDisks;
+        return m_PegContent[_NumberOfPegs - 1].Count == _NumberOfDisks;
     }
     
     void Solver(int diskCount, int fromPole, int toPole, int viaPole)
@@ -410,7 +418,73 @@ public class GameController : MonoBehaviour {
 
     void CalculateSolution()
     {
+        m_Solution.Clear();
         Solver(_NumberOfDisks, 1, _NumberOfPegs, 2);
+    }
+
+    public void NewGame(int diff)
+    {
+        switch (diff)
+        {
+            case 1:
+               
+                _NumberOfPegs = 3;
+                _NumberOfDisks = 3;
+               
+                break;
+            case 2:
+                _NumberOfPegs = 4;
+                _NumberOfDisks = 4;
+                break;
+            case 3:
+                _NumberOfPegs = 4;
+                _NumberOfDisks = 6;
+                break;
+        }
+        m_State = GameState.intro;
+        m_SelectedDisk = null;
+        m_P1.Clear();
+        m_P2.Clear();
+        m_P3.Clear();
+        m_P4.Clear();
+        m_PegContent.Add(m_P1);
+        m_PegContent.Add(m_P2);
+        m_PegContent.Add(m_P3);
+        if (_NumberOfPegs == 4)
+        {
+            m_PegContent.Add(m_P4);
+        }
+        for (int i = _NumberOfDisks; i > 0; --i)
+        {
+            m_PegContent[0].Push(i);
+        }
+
+        for (int i = 1; i <= 6; i++)
+        {
+            m_Disks[i.ToString()].transform.position = _StartPos[i - 1];
+            if (i > _NumberOfDisks)
+            {
+                m_Disks[i.ToString()].SetActive(false);
+            }
+            else
+            {
+                m_Disks[i.ToString()].SetActive(true);
+            }
+        }
+ 
+        if (_NumberOfPegs == 3)
+        {
+            m_Pegs["4"].SetActive(false);
+        }
+        else
+        {
+            m_Pegs["4"].SetActive(true);
+        }
+       
+
+        CalculateSolution();
+        m_State = GameState.waiting;
+        _GameOverImage.SetActive(false);
     }
 }
 

@@ -1,6 +1,8 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+
+
 public enum GameState { intro, waiting, animateUp, animateTo, animateDown, gameover}
 public class GameController : MonoBehaviour {
 
@@ -40,11 +42,12 @@ public class GameController : MonoBehaviour {
     float m_MoveSpeed = 2f;
     private Vector3 m_DestinationTransform;
 
-    private List<List<int>> m_PegContent = new List<List<int>>();
-    private List<int> m_P1 = new List<int>();
-    private List<int> m_P2 = new List<int>();
-    private List<int> m_P3 = new List<int>();
-    private List<int> m_P4 = new List<int>();
+    private List<Stack<int>> m_PegContent = new List<Stack<int>>();
+   
+    private Stack<int> m_P1 = new Stack<int>();
+    private Stack<int> m_P2 = new Stack<int>();
+    private Stack<int> m_P3 = new Stack<int>();
+    private Stack<int> m_P4 = new Stack<int>();
 
     private Dictionary<string, GameObject> m_Pegs = new Dictionary<string, GameObject>();
     private Dictionary<string, GameObject> m_Disks = new Dictionary<string, GameObject>();
@@ -78,7 +81,7 @@ public class GameController : MonoBehaviour {
         }
         for (int i = _NumberOfDisks; i > 0; --i)
         {
-            m_PegContent[0].Add(i);
+            m_PegContent[0].Push(i);
         }
 
         GameObject[] disks = GameObject.FindGameObjectsWithTag("disk");
@@ -165,7 +168,8 @@ public class GameController : MonoBehaviour {
         {
             //Get Ai to move
            
-            Move m = GetNextMove(_NumberOfDisks);
+            Move m = GetNextMove();
+            Debug.Log("Computer suggest moving disk" + m.disk + " from peg " + m.from + " to peg "+ m.to);
             GameObject toMove = _Disk1;
             switch (m.disk)
             {
@@ -213,7 +217,7 @@ public class GameController : MonoBehaviour {
                     int fromLocation = -1;
                     for (int i = 0; i < m_PegContent.Count; ++i)
                     {
-                        if (m_PegContent[i].IndexOf(selectDisk) != -1)
+                        if (m_PegContent[i].Contains(selectDisk))
                         {
                             fromLocation = i+1;
                             break;
@@ -267,13 +271,14 @@ public class GameController : MonoBehaviour {
 
         for (int i = 0; i < m_PegContent.Count; ++i)
         {
-            if (m_PegContent[i].IndexOf(disk) != -1)
+            if (m_PegContent[i].Contains(disk))
             {
-                m_PegContent[i].Remove(disk);
+                int removed = m_PegContent[i].Pop();
+                Debug.Log("Popped " + removed);
                 break;
             }
         }
-        m_PegContent[peg - 1].Add(disk);
+        m_PegContent[peg - 1].Push(disk);
 
         int numberOfDisksOnPeg = m_PegContent[peg - 1].Count;
         Vector3 restingPOS = new Vector3(
@@ -287,10 +292,9 @@ public class GameController : MonoBehaviour {
     bool CheckMoveLegality(int from, int to, int disk)
     {
         Debug.Log("Checking legality of: " + from + " to " + to + " for disk " + disk);
-        if (disk != m_PegContent[from - 1][m_PegContent[from - 1].Count - 1])
+        if (disk != m_PegContent[from-1].Peek() )
         {
-
-            Debug.Log("Disk not on top. Disk is at " + m_PegContent[from - 1].IndexOf(disk) + " and top element is " + m_PegContent[from - 1][m_PegContent[from - 1].Count - 1]);
+            Debug.Log("Disk not on top.");
             return false;
         }
         if (m_PegContent[to - 1].Count == 0)
@@ -298,7 +302,7 @@ public class GameController : MonoBehaviour {
             Debug.Log("There are no disks on target peg.");
             return true;
         }
-        else if (m_PegContent[to - 1][m_PegContent[to - 1].Count - 1] < disk)
+        else if (m_PegContent[to - 1].Peek() < disk)
         {
             Debug.Log("Cannot move on top of a smaller disk.");
             return false;
@@ -362,29 +366,9 @@ public class GameController : MonoBehaviour {
         }
     }
 
-    Move GetNextMove(int biggestPeg)
+    Move GetNextMove()
     {
-        //first find where our biggest disk is.
-        for (int i = 0; i < m_PegContent.Count; ++i)
-        {
-            if (m_PegContent[i].IndexOf(biggestPeg) != -1)//Found the largest disk
-            {
-                //if the biggest disk is already on the correct peg.
-                if (i == _NumberOfPegs - 1)
-                {
-                    return GetNextMove(biggestPeg - 1);
-                }
-                else//else we need to move x disks from there.
-                {
-                    if (m_PegContent[i].Count == 1 && m_PegContent[_NumberOfPegs-1].Count == 0)//
-                    {
-
-                        return new Move(i , _NumberOfPegs - 1, biggestPeg);
-                    }
-                }
-            }
-        }
-
+        
 
         return new Move(0, 0, 0);
     }
